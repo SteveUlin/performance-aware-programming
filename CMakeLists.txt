@@ -10,7 +10,6 @@ set(CMAKE_CXX_EXTENSIONS Off)
 add_compile_options(
   -Wall
   -Wextra
-  -Werror
 )
 
 find_package(fmt CONFIG REQUIRED)

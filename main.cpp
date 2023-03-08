@@ -25,6 +25,7 @@
 #include <vector>
 
 typedef uint8_t u8;
+typedef uint16_t u16;
 
 using namespace std::string_view_literals;
 
@@ -44,51 +45,136 @@ constexpr std::array<std::array<std::string_view, 2>, 8> kregister_names = {{
 
 namespace Instruction
 {
-  // Two byte Reg to Reg MOV instruction.
-  struct RegToReg_MOV2
+  // R/M to/from Reg
+  class MovRmToFromReg
   {
-    u8 w : 1;
-    u8 d : 1;
-    u8 opcode : 6;
-
-    u8 rm : 3;
-    u8 reg : 3;
-    u8 mod : 2;
-
-    bool isValid()
+  public:
+    static bool tryParse(u8 *&head, const u8 *const end, std::string &asm_str)
     {
-      return this->opcode == 0b100010 && this->mod == 0b11;
+      if (head + 2 > end)
+        return false;
+      auto *inst = reinterpret_cast<const MovRmToFromReg *>(head);
+      if (inst->opcode_ != kOpcode_)
+        return false;
+      if (inst->mod_ == 0b11) // Register to register
+      {
+        asm_str = inst->GenRegRegAsm();
+        head += 2;
+        return true;
+      }
+      if (inst->mod_ == 0b01 && head + 3 > end)
+        return false;
+      if (inst->mod_ == 0b10 && head + 4 > end)
+        return false;
+      asm_str = inst->GenEffectiveAddressAsm();
+      head += 2 + inst->mod_;
+      return true;
     }
 
-    std::string GenAsm()
+  private:
+    std::string GenRegRegAsm() const
     {
-      std::string_view reg = kregister_names[this->reg][this->w];
-      std::string_view rm = kregister_names[this->rm][this->w];
-      if (d)
+      std::string_view reg = kregister_names[reg_][w_];
+      std::string_view rm = kregister_names[rm_][w_];
+      if (d_)
         return fmt::format("mov {}, {}", reg, rm);
       return fmt::format("mov {}, {}", rm, reg);
     }
+
+    std::string GenEffectiveAddressAsm() const
+    {
+      std::string_view reg = kregister_names[reg_][w_];
+      std::string effective = std::string(kEffectiveAddress[rm_]);
+
+      if (mod_ == 0b01 && disp_lo_ != 0)
+        effective += fmt::format(" + {}", disp_lo_);
+      else if (mod_ == 0b10 && (disp_lo_ != 0 || disp_hi_ != 0))
+        effective += fmt::format(" + {}", static_cast<u16>(disp_lo_) | (static_cast<u16>(disp_hi_) << 8));
+
+      if (d_)
+        return fmt::format("mov {}, [{}]", reg, effective);
+      return fmt::format("mov [{}], {}", effective, reg);
+    }
+
+    constexpr static u8 kOpcode_ = 0b100010;
+
+    constexpr static std::array<std::string_view, 8> kEffectiveAddress = {{
+        "bx + si"sv,
+        "bx + di"sv,
+        "bp + si"sv,
+        "bp + di"sv,
+        "si"sv,
+        "di"sv,
+        "bp"sv,
+        "bx"sv,
+    }};
+
+    u8 w_ : 1;
+    u8 d_ : 1;
+    u8 opcode_ : 6;
+
+    u8 rm_ : 3;
+    u8 reg_ : 3;
+    u8 mod_ : 2;
+
+    u8 disp_lo_ : 8;
+
+    u8 disp_hi_ : 8;
   };
 
+  class MovImmToReg
+  {
+  public:
+    static bool tryParse(u8 *&head, const u8 *const end, std::string &asm_str)
+    {
+      if (head + 2 > end)
+        return false;
+      auto *inst = reinterpret_cast<const MovImmToReg *>(head);
+      if (inst->opcode_ != kOpcode)
+        return false;
+      if (inst->w_ == 1 && head + 3 > end)
+        return false;
+      asm_str = inst->GenAsm();
+      head += 2 + inst->w_;
+      return true;
+    }
+
+  private:
+    std::string GenAsm() const
+    {
+      std::string_view reg = kregister_names[reg_][w_];
+      if (w_)
+        return fmt::format("mov {}, {}", reg, static_cast<u16>(data0_) | (static_cast<u16>(data1_) << 8));
+      return fmt::format("mov {}, {}", reg, data0_);
+    }
+
+    constexpr static u8 kOpcode = 0b1011;
+
+    u8 reg_ : 3;
+    u8 w_ : 1;
+    u8 opcode_ : 4;
+
+    u8 data0_ : 8;
+    u8 data1_ : 8;
+  };
 };
 
 // Disassembles binary machine code to assembly for a Intel 8086 processor
 // Returns false on error. Errors are printed to the output stream.
 void DissasembleBytes(u8 *head, u8 *end)
 {
-  while (head < end)
+  std::string line;
+  u8 *curr = head;
+  while (curr < end)
   {
-    auto *inst = reinterpret_cast<Instruction::RegToReg_MOV2 *>(head);
-    if (inst->isValid())
+    if (Instruction::MovRmToFromReg::tryParse(curr, end, line) ||
+        Instruction::MovImmToReg::tryParse(curr, end, line))
     {
-      std::cout << inst->GenAsm() << std::endl;
-      head += 2;
+      std::cout << line << std::endl;
+      continue;
     }
-    else
-    {
-      std::cout << fmt::format("Invalid instruction: {}b", *head) << std::endl;
-      return;
-    }
+    std::cout << fmt::format("Invalid instruction at position: {}: {:b}", std::distance(head, curr), *curr) << std::endl;
+    return;
   }
   return;
 }
@@ -113,5 +199,5 @@ int main(int argc, char **argv)
     return 1;
   }
   file.close();
-  DissasembleBytes(bytes.data(), bytes.data() + bytes.size() - 3);
+  DissasembleBytes(bytes.data(), bytes.data() + bytes.size());
 }
