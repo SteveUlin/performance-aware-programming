@@ -1,0 +1,6 @@
+{
+  "name" : "performance-aware-programming",
+  "dependencies" : [
+    "fmt"
+  ]
+}
