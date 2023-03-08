@@ -11,7 +11,7 @@
  * $ wdiff <(./build/disassemble ./data/many_reg_move) ./data/many_reg_move.asm
  */
 
-// [2024-03-05]: Format is default disabled by the clang++ compiler.
+ // [2024-03-05]: Format is default disabled by the clang++ compiler.
 #include <fmt/format.h>
 
 #include <array>
@@ -21,7 +21,6 @@
 #include <iterator>
 #include <string>
 #include <string_view>
-#include <span>
 #include <vector>
 
 typedef uint8_t u8;
@@ -32,7 +31,7 @@ using namespace std::string_view_literals;
 // Names of the registers indexed by the register code.
 // The fist element is when the w bit is 0 and the second is when it is 1.
 // See pg. 4-20 of the Intel 8086 manual.
-constexpr std::array<std::array<std::string_view, 2>, 8> kregister_names = {{
+constexpr std::array<std::array<std::string_view, 2>, 8> kregister_names = { {
     {"al"sv, "ax"sv}, // 0b000
     {"cl"sv, "cx"sv}, // 0b001
     {"dl"sv, "dx"sv}, // 0b010
@@ -41,23 +40,18 @@ constexpr std::array<std::array<std::string_view, 2>, 8> kregister_names = {{
     {"ch"sv, "bp"sv}, // 0b101
     {"dh"sv, "si"sv}, // 0b110
     {"bh"sv, "di"sv}  // 0b111
-}};
+} };
 
-namespace Instruction
-{
-  // R/M to/from Reg
-  class MovRmToFromReg
-  {
+namespace Instruction {
+  class MovRmToFromReg {
   public:
-    static bool tryParse(u8 *&head, const u8 *const end, std::string &asm_str)
-    {
+    static bool tryParse(u8*& head, const u8* const end, std::string& asm_str) {
       if (head + 2 > end)
         return false;
-      auto *inst = reinterpret_cast<const MovRmToFromReg *>(head);
+      auto* inst = reinterpret_cast<const MovRmToFromReg*>(head);
       if (inst->opcode_ != kOpcode_)
         return false;
-      if (inst->mod_ == 0b11) // Register to register
-      {
+      if (inst->mod_ == 0b11) {
         asm_str = inst->GenRegRegAsm();
         head += 2;
         return true;
@@ -72,8 +66,7 @@ namespace Instruction
     }
 
   private:
-    std::string GenRegRegAsm() const
-    {
+    std::string GenRegRegAsm() const {
       std::string_view reg = kregister_names[reg_][w_];
       std::string_view rm = kregister_names[rm_][w_];
       if (d_)
@@ -81,8 +74,7 @@ namespace Instruction
       return fmt::format("mov {}, {}", rm, reg);
     }
 
-    std::string GenEffectiveAddressAsm() const
-    {
+    std::string GenEffectiveAddressAsm() const {
       std::string_view reg = kregister_names[reg_][w_];
       std::string effective = std::string(kEffectiveAddress[rm_]);
 
@@ -98,7 +90,7 @@ namespace Instruction
 
     constexpr static u8 kOpcode_ = 0b100010;
 
-    constexpr static std::array<std::string_view, 8> kEffectiveAddress = {{
+    constexpr static std::array<std::string_view, 8> kEffectiveAddress = { {
         "bx + si"sv,
         "bx + di"sv,
         "bp + si"sv,
@@ -107,7 +99,7 @@ namespace Instruction
         "di"sv,
         "bp"sv,
         "bx"sv,
-    }};
+    } };
 
     u8 w_ : 1;
     u8 d_ : 1;
@@ -125,11 +117,10 @@ namespace Instruction
   class MovImmToReg
   {
   public:
-    static bool tryParse(u8 *&head, const u8 *const end, std::string &asm_str)
-    {
+    static bool tryParse(u8*& head, const u8* const end, std::string& asm_str) {
       if (head + 2 > end)
         return false;
-      auto *inst = reinterpret_cast<const MovImmToReg *>(head);
+      auto* inst = reinterpret_cast<const MovImmToReg*>(head);
       if (inst->opcode_ != kOpcode)
         return false;
       if (inst->w_ == 1 && head + 3 > end)
@@ -140,8 +131,7 @@ namespace Instruction
     }
 
   private:
-    std::string GenAsm() const
-    {
+    std::string GenAsm() const {
       std::string_view reg = kregister_names[reg_][w_];
       if (w_)
         return fmt::format("mov {}, {}", reg, static_cast<u16>(data0_) | (static_cast<u16>(data1_) << 8));
@@ -161,15 +151,13 @@ namespace Instruction
 
 // Disassembles binary machine code to assembly for a Intel 8086 processor
 // Returns false on error. Errors are printed to the output stream.
-void DissasembleBytes(u8 *head, u8 *end)
+void DissasembleBytes(u8* head, u8* end)
 {
   std::string line;
-  u8 *curr = head;
-  while (curr < end)
-  {
+  u8* curr = head;
+  while (curr < end) {
     if (Instruction::MovRmToFromReg::tryParse(curr, end, line) ||
-        Instruction::MovImmToReg::tryParse(curr, end, line))
-    {
+      Instruction::MovImmToReg::tryParse(curr, end, line)) {
       std::cout << line << std::endl;
       continue;
     }
@@ -179,25 +167,23 @@ void DissasembleBytes(u8 *head, u8 *end)
   return;
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
-  if (argc != 2)
-  {
+  if (argc != 2) {
     std::cout << "Usage: " << argv[0] << " <file>" << std::endl;
     return 1;
   }
   std::ifstream file(argv[1], std::ios::binary);
-  if (!file.is_open())
-  {
+  if (!file.is_open()) {
     std::cout << "Could not open file: " << argv[1] << std::endl;
     return 1;
   }
-  std::vector<u8> bytes = {std::istreambuf_iterator<char>(file), {}};
-  if (!file)
-  {
+  std::vector<u8> bytes = { std::istreambuf_iterator<char>(file), {} };
+  if (!file) {
     std::cout << "Could not read file: " << argv[1] << std::endl;
     return 1;
   }
   file.close();
   DissasembleBytes(bytes.data(), bytes.data() + bytes.size());
+  return 0;
 }
