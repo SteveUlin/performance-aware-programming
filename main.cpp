@@ -114,8 +114,7 @@ namespace Instruction {
     u8 disp_hi_ : 8;
   };
 
-  class MovImmToReg
-  {
+  class MovImmToReg {
   public:
     static bool tryParse(u8*& head, const u8* const end, std::string& asm_str) {
       if (head + 2 > end)
@@ -151,8 +150,7 @@ namespace Instruction {
 
 // Disassembles binary machine code to assembly for a Intel 8086 processor
 // Returns false on error. Errors are printed to the output stream.
-void DissasembleBytes(u8* head, u8* end)
-{
+void DissasembleBytes(u8* head, u8* end) {
   std::string line;
   u8* curr = head;
   while (curr < end) {
@@ -167,8 +165,7 @@ void DissasembleBytes(u8* head, u8* end)
   return;
 }
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
   if (argc != 2) {
     std::cout << "Usage: " << argv[0] << " <file>" << std::endl;
     return 1;
