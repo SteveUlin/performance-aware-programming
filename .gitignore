@@ -1,4 +1,8 @@
+.cache/
 .vscode/
 build/
 CMakeFiles/
 vcpkg/
+
+.editorconfig
+compile_commands.json
