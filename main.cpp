@@ -22,6 +22,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 typedef uint8_t u8;
@@ -308,6 +309,76 @@ private:
   u8 prefix_ : 2;
 };
 
+class Jumps {
+public:
+  static bool TryParse(u8 *&head, const u8 *const end, std::string &asm_str) {
+    // Precondition: head + 2 <= end
+    auto *inst = reinterpret_cast<const Jumps *>(head);
+    if (inst->opcode_ != kOpCode_)
+      return false;
+    int disp = *(head + 1);
+    if (disp > 128)
+      disp -= 256;
+    asm_str = fmt::format("{} {}", kJumpOps[inst->cond_], disp);
+    head += 2;
+    return true;
+  }
+
+private:
+  constexpr static u8 kOpCode_ = 0b0111;
+  constexpr static std::array<std::string_view, 16> kJumpOps = {{
+      "jo"sv,
+      "jno"sv,
+      "jb"sv,
+      "jnb"sv,
+      "jz"sv,
+      "jnz"sv,
+      "jbe"sv,
+      "ja"sv,
+      "js"sv,
+      "jns"sv,
+      "jpe"sv,
+      "jpo"sv,
+      "jl"sv,
+      "jge"sv,
+      "jle"sv,
+      "jg"sv,
+  }};
+
+  u8 cond_ : 4;
+  u8 opcode_ : 4;
+};
+
+class Loops {
+public:
+  static bool TryParse(u8 *&head, const u8 *const end, std::string &asm_str) {
+    // Precondition: head + 2 <= end
+    auto *inst = reinterpret_cast<const Loops *>(head);
+    if (inst->opcode_ != kOpCode_)
+      return false;
+    if (inst->cond_ >= 4)
+      // Not implemented
+      return false;
+    int disp = *(head + 1);
+    if (disp > 128)
+      disp -= 256;
+    asm_str = fmt::format("{} {}", kLoopOps[inst->cond_], disp);
+    head += 2;
+    return true;
+  }
+
+private:
+  constexpr static u8 kOpCode_ = 0b1110;
+  constexpr static std::array<std::string_view, 4> kLoopOps = {{
+      "loopnz"sv,
+      "loopz"sv,
+      "loop"sv,
+      "jcxz"sv,
+  }};
+  u8 cond_ : 4;
+  u8 opcode_ : 4;
+};
+
 }; // namespace Instruction
 
 // Disassembles binary machine code to assembly for a Intel 8086 processor
@@ -316,18 +387,12 @@ void DissasembleBytes(u8 *head, u8 *end) {
   std::string line;
   u8 *curr = head;
   while (curr + 1 < end) {
-    // std::cout << fmt::format("Parse head at position: {}.",
-    //                          std::distance(head, curr))
-    //           << std::endl;
-    // for (int i = 0; i < 5; ++i) {
-    //   std::cout << fmt::format("{0:8b}, ", *(curr + i));
-    // }
-    // std::cout << std::endl;
-    // std::cout << std::endl;
     if (Instruction::DWPattern::TryParse(curr, end, line) ||
         Instruction::SWPattern::TryParse(curr, end, line) ||
         Instruction::ImmToAccumulator::TryParse(curr, end, line) ||
-        Instruction::MovImmToReg::TryParse(curr, end, line)) {
+        Instruction::MovImmToReg::TryParse(curr, end, line) ||
+        Instruction::Jumps::TryParse(curr, end, line) ||
+        Instruction::Loops::TryParse(curr, end, line)) {
       std::cout << line << std::endl;
       continue;
     }
