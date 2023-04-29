@@ -1,19 +1,26 @@
-cmake_minimum_required(VERSION 3.2)
-set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake"
-  CACHE STRING "Vcpkg toolchain file")
-
+cmake_minimum_required(VERSION 3.26)
 project(PerformanceAwareProgramming)
+
+include(FetchContent)
+include(ExternalProject)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED On)
-set(CMAKE_CXX_EXTENSIONS Off)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 add_compile_options(
   -Wall
   -Wextra
 )
 
-find_package(fmt CONFIG REQUIRED)
+FetchContent_Declare(
+  fmt
+  GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+  GIT_TAG master
+  GIT_SHALLOW ON
+)
+FetchContent_MakeAvailable(fmt)
 
 add_executable(disassemble main.cpp)
-target_link_libraries(disassemble PRIVATE fmt::fmt)
+target_link_libraries(disassemble PRIVATE fmt)
